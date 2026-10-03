@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wifi-network-map"
+version = "0.1.0"
+description = "Discover devices on a local network, detect open ports, and render a live topology dashboard."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Atuse" }]
+license = { text = "MIT" }
+keywords = ["network", "security", "arp", "scapy", "topology", "dashboard"]
+dependencies = [
+  "scapy==2.7.0",
+  "pyvis==0.3.2",
+  "mac-vendor-lookup==0.1.15",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.1.1",
+]
+
+[project.scripts]
+network-map = "we547:main"
+
+[tool.pytest.ini_options]
+pythonpath = "."
+testpaths = ["tests"]
