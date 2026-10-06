@@ -1,11 +1,11 @@
 # Wi-Fi Network Map
 
-[![CI](https://github.com/Benedwe/Atuse/actions/workflows/ci.yml/badge.svg)](https://github.com/Benedwe/Atuse/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Benedwe/Atuse?include_prereleases)](https://github.com/Benedwe/Atuse/releases)
-[![Latest release](https://img.shields.io/github/release-date/Benedwe/Atuse)](https://github.com/Benedwe/Atuse/releases/latest)
+[![CI](https://github.com/Agape1211/Atuse/actions/workflows/ci.yml/badge.svg)](https://github.com/Agape1211/Atuse/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Agape1211/Atuse?include_prereleases)](https://github.com/Agape1211/Atuse/releases)
+[![Latest release](https://img.shields.io/github/release-date/Agape1211/Atuse)](https://github.com/Agape1211/Atuse/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-beta-orange)](https://github.com/Benedwe/Atuse)
+[![Status](https://img.shields.io/badge/status-beta-orange)](https://github.com/Agape1211/Atuse)
 
 A Linux-first networking utility that discovers devices on your local network, identifies open TCP ports, and builds a live HTML topology dashboard.
 
@@ -45,8 +45,8 @@ Required tools:
 Clone the repository and set up a virtual environment:
 
 ```bash
-git clone https://github.com/Benedwe/Atuse.git
-cd wifi-network-map
+git clone https://github.com/Agape1211/Atuse.git
+cd Atuse
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wifi-network-map"
-version = "0.1.0"
+version = "0.1.1"
 description = "Discover devices on a local network, detect open ports, and render a live topology dashboard."
 readme = "README.md"
 requires-python = ">=3.10"
