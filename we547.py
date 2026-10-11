@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+from html import escape
 import json
 import re
 import socket
+import ssl
 import subprocess
 import sys
 import time
@@ -20,6 +22,15 @@ from scapy.all import ARP, Ether, srp
 
 __version__ = "0.1.1"
 DEFAULT_PORTS = [22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 445, 3306, 8080, 8443]
+SERVICE_NAMES = {
+    21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns", 80: "http",
+    110: "pop3", 143: "imap", 443: "https", 445: "microsoft-ds", 465: "smtps",
+    587: "submission", 993: "imaps", 995: "pop3s", 1433: "ms-sql-s",
+    3306: "mysql", 3389: "ms-wbt-server", 5432: "postgresql", 5900: "vnc",
+    6379: "redis", 8080: "http-proxy", 8443: "https-alt", 27017: "mongodb",
+}
+HTTP_PORTS = {80, 8000, 8008, 8080, 8888}
+TLS_PORTS = {443, 465, 636, 853, 989, 990, 993, 995, 8443}
 
 
 def parse_port_list(port_spec: str | Iterable[int] | None) -> list[int]:
@@ -166,10 +177,70 @@ def detect_open_ports(ip_address: str, ports: Iterable[int] | None = None, timeo
     return open_ports
 
 
+def fingerprint_service(ip_address: str, port: int, timeout: float = 0.25) -> dict:
+    """Identify a TCP service from its port and a bounded protocol greeting."""
+    service = SERVICE_NAMES.get(port)
+    if service is None:
+        try:
+            service = socket.getservbyport(port, "tcp")
+        except OSError:
+            service = "unknown"
+
+    banner = ""
+    connection = None
+    try:
+        connection = socket.create_connection((ip_address, port), timeout=timeout)
+        connection.settimeout(timeout)
+        if port in TLS_PORTS:
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            connection = context.wrap_socket(connection, server_hostname=ip_address)
+
+        if port in HTTP_PORTS or port in TLS_PORTS and port in {443, 8443}:
+            connection.sendall(f"HEAD / HTTP/1.0\r\nHost: {ip_address}\r\nConnection: close\r\n\r\n".encode())
+        response = connection.recv(512)
+        decoded_response = response.decode("utf-8", errors="replace")
+        banner = re.sub(r"[\x00-\x1f\x7f]", " ", decoded_response)
+        banner = " ".join(banner.split())[:200]
+    except (OSError, ssl.SSLError):
+        pass
+    finally:
+        if connection is not None:
+            connection.close()
+
+    lowered_banner = banner.lower()
+    if banner.startswith("SSH-"):
+        service = "ssh"
+    elif banner.startswith("HTTP/"):
+        service = "http" if port not in TLS_PORTS else "https"
+    elif "ftp" in lowered_banner and banner.startswith("220"):
+        service = "ftp"
+    elif banner.startswith("+ok"):
+        service = "pop3"
+    elif banner.startswith("* ok"):
+        service = "imap"
+
+    product = ""
+    server_match = re.search(r"(?:^| )server:\s*([^\r\n]+)", banner, re.IGNORECASE)
+    if server_match:
+        product = server_match.group(1).strip()
+    elif banner.startswith(("SSH-", "220", "+OK", "* OK")):
+        product = banner.split(" ", 1)[0]
+
+    return {
+        "port": port,
+        "service": service,
+        "product": product,
+        "banner": banner,
+    }
+
+
 def enrich_device_ports(device: dict, ports: Iterable[int] | None = None, timeout: float = 0.25) -> dict:
-    """Attach open TCP ports to a device record."""
+    """Attach open TCP ports and service fingerprints to a device record."""
     ip_address = str(device.get("ip", "")).strip()
     device["ports"] = detect_open_ports(ip_address, ports=ports, timeout=timeout) if ip_address else []
+    device["services"] = [fingerprint_service(ip_address, port, timeout=timeout) for port in device["ports"]]
     return device
 
 
@@ -208,6 +279,7 @@ def build_dashboard_state(gateway_ip: str, devices: Iterable[dict]) -> dict:
             "vendor": device.get("vendor") or "Unknown",
             "mac": device.get("mac") or "Unknown",
             "ports": device.get("ports") or [],
+            "services": device.get("services") or [],
         }
         for device in devices
         if device.get("ip")
@@ -254,6 +326,7 @@ def render_dashboard_html(output_path: str = "dashboard.html") -> str:
     th { background: rgba(30,41,59,0.8); }
     .port-list { display:flex; flex-wrap: wrap; gap: 8px; }
     .port { background: rgba(56,189,248,0.18); color: #bae6fd; border:1px solid rgba(56,189,248,0.35); border-radius: 999px; padding: 4px 8px; font-size: 0.8rem; }
+    .service { display:inline-block; margin:2px 6px 2px 0; color:#bbf7d0; font-size:0.85rem; }
     .status { color: var(--accent); font-weight: bold; }
     .muted { color: var(--muted); }
   </style>
@@ -274,7 +347,7 @@ def render_dashboard_html(output_path: str = "dashboard.html") -> str:
       <h2>Discovered Hosts</h2>
       <table>
         <thead>
-          <tr><th>Host</th><th>IP</th><th>Vendor</th><th>Open Ports</th></tr>
+          <tr><th>Host</th><th>IP</th><th>Vendor</th><th>Open Ports</th><th>Services</th></tr>
         </thead>
         <tbody id=\"deviceTable\"></tbody>
       </table>
@@ -294,13 +367,32 @@ def render_dashboard_html(output_path: str = "dashboard.html") -> str:
         tbody.innerHTML = '';
         for (const device of data.devices || []) {
           const row = document.createElement('tr');
-          const portMarkup = (device.ports || []).map(port => `<span class="port">${port}</span>`).join('') || '<span class="muted">None</span>';
-          row.innerHTML = `
-            <td>${device.hostname || device.ip}</td>
-            <td>${device.ip}</td>
-            <td>${device.vendor || 'Unknown'}</td>
-            <td><div class="port-list">${portMarkup}</div></td>
-          `;
+                    const cellValues = [device.hostname || device.ip, device.ip, device.vendor || 'Unknown'];
+                    for (const value of cellValues) {
+                        const cell = document.createElement('td');
+                        cell.textContent = value;
+                        row.appendChild(cell);
+                    }
+                    const portsCell = document.createElement('td');
+                    const portList = document.createElement('div');
+                    portList.className = 'port-list';
+                    for (const port of device.ports || []) {
+                        const badge = document.createElement('span');
+                        badge.className = 'port';
+                        badge.textContent = port;
+                        portList.appendChild(badge);
+                    }
+                    portsCell.appendChild(portList);
+                    row.appendChild(portsCell);
+                    const servicesCell = document.createElement('td');
+                    for (const service of device.services || []) {
+                        const label = document.createElement('span');
+                        label.className = 'service';
+                        label.textContent = `${service.port}/${service.service}${service.product ? ` (${service.product})` : ''}`;
+                        label.title = service.banner || service.product || service.service;
+                        servicesCell.appendChild(label);
+                    }
+                    row.appendChild(servicesCell);
           tbody.appendChild(row);
         }
       } catch (error) {
@@ -337,8 +429,18 @@ def render_network_map(gateway_ip: str, devices: Iterable[dict], output_path: st
 
         hostname = str(device.get("hostname") or ip_address).strip() or ip_address
         vendor = str(device.get("vendor") or "Unknown").strip() or "Unknown"
+        services = device.get("services") or []
+        service_details = "\n".join(
+            escape(
+                f"{service.get('port')}/{service.get('service', 'unknown')}: "
+                f"{service.get('product') or service.get('banner') or 'no banner'}"
+            )
+            for service in services
+        )
         device_label = f"{hostname}\n{vendor}"
         device_title = f"IP: {ip_address}\nMAC: {device.get('mac', 'Unknown')}\nVendor: {vendor}"
+        if service_details:
+            device_title += f"\nServices:\n{service_details}"
 
         network.add_node(ip_address, label=device_label, title=device_title, color="#3b82f6", size=18, shape="box")
         network.add_edge(gateway_ip, ip_address, value=2)
@@ -429,7 +531,12 @@ def main() -> int:
                 for device in devices:
                     hostname = device.get("hostname") or device["ip"]
                     ports_list = ", ".join(str(port) for port in device.get("ports", [])) or "none"
-                    print(f"- {device['ip']} | {hostname} | {device.get('vendor', 'Unknown')} | ports: {ports_list}")
+                    services_list = ", ".join(
+                        f"{service['port']}/{service['service']}"
+                        + (f" ({service['product']})" if service.get("product") else "")
+                        for service in device.get("services", [])
+                    ) or "none"
+                    print(f"- {device['ip']} | {hostname} | {device.get('vendor', 'Unknown')} | ports: {ports_list} | services: {services_list}")
 
             if args.refresh <= 0:
                 break

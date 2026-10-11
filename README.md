@@ -22,7 +22,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and release updates.
 - Discovers the default gateway and local subnet automatically
 - Uses ARP scanning to find active devices on the LAN
 - Resolves hostnames and MAC vendors for each device
-- Scans common TCP ports to identify likely services
+- Scans common TCP ports and fingerprints likely services from port numbers and TCP banners
 - Generates a topology map in HTML
 - Produces a live dashboard JSON feed and refreshable dashboard page
 - Supports JSON output for scripts and automation
@@ -75,6 +75,7 @@ This will:
 - scan the network for active devices
 - look up hostnames and vendors for each host
 - probe common TCP ports
+- identify likely service names and capture short protocol banners where available
 - generate an HTML topology map
 - create a refreshable dashboard in `dashboard/`
 
@@ -113,10 +114,11 @@ flowchart LR
     C --> D[Normalize device records]
     D --> E[Resolve hostname + vendor]
     E --> F[Probe configured TCP ports]
-    F --> G[Render HTML topology map]
-    F --> H[Write dashboard JSON + dashboard page]
-    G --> I[Open network_map.html]
-    H --> J[Open dashboard/index.html]
+    F --> G[Fingerprint open services]
+    G --> H[Render HTML topology map]
+    G --> I[Write dashboard JSON + dashboard page]
+    H --> J[Open network_map.html]
+    I --> K[Open dashboard/index.html]
 ```
 
 ## What gets created
@@ -197,10 +199,11 @@ The project is intentionally small and layered so contributors can follow the fl
 1. `gateway_and_cidr()` inspects the routing table and identifies the local network.
 2. `scan_network()` sends ARP requests across the target CIDR and receives replies from live hosts.
 3. `normalize_device()` standardizes each response into a consistent device object.
-4. `detect_open_ports()` checks a configurable list of TCP ports to identify active services.
-5. `render_network_map()` builds the topology graph with `pyvis`.
-6. `build_dashboard_state()` creates the metrics summary used by the refreshable dashboard.
-7. `main()` wires everything together through the CLI and handles argument validation.
+4. `detect_open_ports()` checks a configurable list of TCP ports for open connections.
+5. `fingerprint_service()` combines conventional port names with a short TCP response where available.
+6. `render_network_map()` builds the topology graph with `pyvis`.
+7. `build_dashboard_state()` creates the metrics and service summary used by the refreshable dashboard.
+8. `main()` wires everything together through the CLI and handles argument validation.
 
 If you are adding a feature, keep the workflow in this order: parse input, scan network, enrich data, render output, then expose it through the CLI.
 
@@ -215,7 +218,6 @@ If you are adding a feature, keep the workflow in this order: parse input, scan 
 ## Roadmap
 
 - add passive discovery enhancements
-- add service fingerprinting
 - add export to JSON and CSV
 - add richer visualization themes and filters
 - add more device intelligence and event-driven refresh logic
