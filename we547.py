@@ -305,53 +305,90 @@ def render_dashboard_html(output_path: str = "dashboard.html") -> str:
 <html lang=\"en\">
 <head>
   <meta charset=\"UTF-8\" />
-  <meta http-equiv=\"refresh\" content=\"15\" />
   <title>Network Dashboard</title>
   <style>
     :root {
-      --bg: #0b1120; --panel: #111827; --panel-alt: #1f2937; --accent: #22c55e; --primary: #38bdf8; --text: #e5e7eb; --muted: #94a3b8; --danger: #f97316;
+            color-scheme: light;
+            --bg: #f2f4ef; --panel: #ffffff; --ink: #1b2926; --muted: #687773;
+            --line: #dce3dd; --accent: #187b65; --accent-soft: #e5f3ee;
+            --signal: #bd643c; --signal-soft: #fbede6;
     }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: Arial, sans-serif; background: linear-gradient(135deg, #020817, #111827); color: var(--text); }
-    .container { width: min(1200px, 95%); margin: 32px auto; }
-    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
-    h1 { margin:0; font-size: clamp(2rem, 4vw, 3rem); }
-    .badge { background: rgba(34,197,94,0.15); color: var(--accent); border: 1px solid rgba(34,197,94,0.3); padding: 8px 16px; border-radius: 999px; font-weight: bold; }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
-    .card { background: rgba(17,24,39,0.9); border: 1px solid rgba(148,163,184,0.2); border-radius: 16px; padding: 20px; }
-    .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; }
-    .value { font-size: 2rem; font-weight: bold; margin-top: 8px; }
-    table { width:100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { padding: 12px 14px; border-bottom: 1px solid rgba(148,163,184,0.2); text-align:left; }
-    th { background: rgba(30,41,59,0.8); }
-    .port-list { display:flex; flex-wrap: wrap; gap: 8px; }
-    .port { background: rgba(56,189,248,0.18); color: #bae6fd; border:1px solid rgba(56,189,248,0.35); border-radius: 999px; padding: 4px 8px; font-size: 0.8rem; }
-    .service { display:inline-block; margin:2px 6px 2px 0; color:#bbf7d0; font-size:0.85rem; }
-    .status { color: var(--accent); font-weight: bold; }
-    .muted { color: var(--muted); }
+        body { margin:0; font-family: "Avenir Next", "Segoe UI", sans-serif; background: radial-gradient(ellipse at 80% 0%, #e2ece6 0, transparent 34rem), var(--bg); color:var(--ink); }
+        .container { width:min(1320px, calc(100% - 48px)); margin:36px auto 56px; }
+        header { display:flex; justify-content:space-between; align-items:flex-end; gap:20px; border-bottom:1px solid var(--line); padding-bottom:22px; margin-bottom:20px; }
+        .eyebrow { color:var(--accent); font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.12em; }
+        h1 { margin:6px 0 0; font-family:Georgia, "Times New Roman", serif; font-size:2.25rem; font-weight:500; }
+        .badge { display:inline-flex; align-items:center; gap:8px; color:var(--accent); font-size:.85rem; font-weight:700; }
+        .badge::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; box-shadow:0 0 0 4px var(--accent-soft); }
+        .badge[data-state="waiting"] { color:var(--signal); }
+        .badge[data-state="waiting"]::before { box-shadow:0 0 0 4px var(--signal-soft); }
+        .grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); border:1px solid var(--line); background:rgba(255,255,255,.72); margin-bottom:30px; }
+        .metric { min-width:0; padding:18px 20px; border-right:1px solid var(--line); }
+        .metric:last-child { border-right:0; }
+        .label { color:var(--muted); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+        .value { overflow-wrap:anywhere; font-family:Georgia, "Times New Roman", serif; font-size:1.65rem; margin-top:8px; }
+        .section-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin:0 0 12px; }
+        h2 { margin:0; font-family:Georgia, "Times New Roman", serif; font-size:1.45rem; font-weight:500; }
+        .search { width:min(300px, 100%); padding:10px 12px; border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--ink); font:inherit; }
+        .table-wrap { overflow-x:auto; border-top:2px solid var(--ink); background:var(--panel); }
+        table { width:100%; border-collapse:collapse; text-align:left; }
+        th, td { padding:13px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+        th { color:var(--muted); font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; }
+        td { font-size:.88rem; }
+        td:first-child { min-width:150px; font-weight:700; }
+        .host-ip { display:block; margin-top:4px; color:var(--muted); font: .78rem ui-monospace, SFMono-Regular, Consolas, monospace; }
+        .port-list { display:flex; flex-wrap:wrap; gap:5px; min-width:90px; }
+        .port { min-width:32px; padding:3px 6px; border:1px solid #c5dacf; border-radius:3px; background:var(--accent-soft); color:#155e4d; text-align:center; font: .76rem ui-monospace, SFMono-Regular, Consolas, monospace; }
+        .service { display:inline-block; margin:1px 8px 4px 0; color:#315c70; font-size:.8rem; }
+        .empty { padding:24px 14px; color:var(--muted); text-align:center; }
+        @media (max-width:760px) {
+            .container { width:calc(100% - 28px); margin:22px auto 36px; }
+            .grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+            .metric:nth-child(2) { border-right:0; }
+            .metric:nth-child(-n+2) { border-bottom:1px solid var(--line); }
+            .metric { padding:14px; }
+            .value { font-size:1.35rem; }
+            .section-heading { align-items:flex-start; flex-direction:column; }
+            .search { width:100%; }
+            .table-wrap { overflow:visible; border-top:0; background:transparent; }
+            table, tbody { display:block; }
+            thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0, 0, 0, 0); white-space:nowrap; }
+            tbody tr { display:block; margin-bottom:10px; border:1px solid var(--line); background:var(--panel); }
+            td, td:first-child { display:grid; grid-template-columns:92px minmax(0, 1fr); gap:10px; min-width:0; padding:10px 12px; }
+            td::before { content:attr(data-label); color:var(--muted); font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+            .host-ip { grid-column:2; }
+            .empty { display:block; }
+        }
+        @media (max-width:380px) { h1 { font-size:1.85rem; } td, td:first-child { grid-template-columns:76px minmax(0, 1fr); } }
   </style>
 </head>
 <body>
   <div class=\"container\">
     <header>
-      <h1>Network Dashboard</h1>
-      <div class=\"badge\" id=\"statusBadge\">Live</div>
+            <div><div class="eyebrow">Local network / topology</div><h1>Network overview</h1></div>
+            <div class="badge" id="statusBadge" data-state="live" role="status">Live</div>
     </header>
     <div class=\"grid\">
-      <div class=\"card\"><div class=\"label\">Gateway</div><div class=\"value\" id=\"gatewayValue\">-</div></div>
-      <div class=\"card\"><div class=\"label\">Devices</div><div class=\"value\" id=\"deviceCount\">0</div></div>
-      <div class=\"card\"><div class=\"label\">Open Ports</div><div class=\"value\" id=\"portCount\">0</div></div>
-      <div class=\"card\"><div class=\"label\">Last Update</div><div class=\"value\" id=\"lastUpdated\">-</div></div>
+            <div class="metric"><div class="label">Gateway</div><div class="value" id="gatewayValue">-</div></div>
+            <div class="metric"><div class="label">Devices</div><div class="value" id="deviceCount">0</div></div>
+            <div class="metric"><div class="label">Open ports</div><div class="value" id="portCount">0</div></div>
+            <div class="metric"><div class="label">Last update</div><div class="value" id="lastUpdated">-</div></div>
     </div>
-    <div class=\"card\">
-      <h2>Discovered Hosts</h2>
+        <section aria-labelledby="hostsHeading">
+            <div class="section-heading">
+                <h2 id="hostsHeading">Discovered hosts</h2>
+                <input class="search" id="hostSearch" type="search" placeholder="Filter hosts, vendors, or services" aria-label="Filter discovered hosts" />
+            </div>
+            <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Host</th><th>IP</th><th>Vendor</th><th>Open Ports</th><th>Services</th></tr>
+                    <tr><th>Host</th><th>Vendor</th><th>Open ports</th><th>Services</th></tr>
         </thead>
-        <tbody id=\"deviceTable\"></tbody>
+                <tbody id="deviceTable"><tr><td class="empty" colspan="4">Waiting for scan data...</td></tr></tbody>
       </table>
-    </div>
+            </div>
+        </section>
   </div>
 
   <script>
@@ -359,21 +396,35 @@ def render_dashboard_html(output_path: str = "dashboard.html") -> str:
       try {
         const response = await fetch('./dashboard_data.json', { cache: 'no-store' });
         const data = await response.json();
+        const statusBadge = document.getElementById('statusBadge');
+        statusBadge.textContent = 'Live';
+        statusBadge.dataset.state = 'live';
         document.getElementById('gatewayValue').textContent = data.gateway || '-';
         document.getElementById('deviceCount').textContent = data.device_count || 0;
         document.getElementById('portCount').textContent = data.open_ports_total || 0;
         document.getElementById('lastUpdated').textContent = data.generated_at || '-';
         const tbody = document.getElementById('deviceTable');
         tbody.innerHTML = '';
-        for (const device of data.devices || []) {
+                const devices = data.devices || [];
+                for (const device of devices) {
           const row = document.createElement('tr');
-                    const cellValues = [device.hostname || device.ip, device.ip, device.vendor || 'Unknown'];
-                    for (const value of cellValues) {
-                        const cell = document.createElement('td');
-                        cell.textContent = value;
-                        row.appendChild(cell);
-                    }
+                    row.dataset.search = [device.hostname, device.ip, device.vendor, ...(device.services || []).map(service => service.service)].join(' ').toLowerCase();
+                    const hostCell = document.createElement('td');
+                    hostCell.dataset.label = 'Host';
+                    hostCell.append(document.createTextNode(device.hostname || device.ip || 'Unknown'));
+                    const ipLabel = document.createElement('span');
+                    ipLabel.className = 'host-ip';
+                    ipLabel.textContent = device.ip || '';
+                    hostCell.appendChild(ipLabel);
+                    row.appendChild(hostCell);
+
+                    const vendorCell = document.createElement('td');
+                    vendorCell.dataset.label = 'Vendor';
+                    vendorCell.textContent = device.vendor || 'Unknown';
+                    row.appendChild(vendorCell);
+
                     const portsCell = document.createElement('td');
+                    portsCell.dataset.label = 'Open ports';
                     const portList = document.createElement('div');
                     portList.className = 'port-list';
                     for (const port of device.ports || []) {
@@ -382,9 +433,12 @@ def render_dashboard_html(output_path: str = "dashboard.html") -> str:
                         badge.textContent = port;
                         portList.appendChild(badge);
                     }
+                    if (!portList.childElementCount) portList.textContent = 'None observed';
                     portsCell.appendChild(portList);
                     row.appendChild(portsCell);
+
                     const servicesCell = document.createElement('td');
+                    servicesCell.dataset.label = 'Services';
                     for (const service of device.services || []) {
                         const label = document.createElement('span');
                         label.className = 'service';
@@ -392,13 +446,24 @@ def render_dashboard_html(output_path: str = "dashboard.html") -> str:
                         label.title = service.banner || service.product || service.service;
                         servicesCell.appendChild(label);
                     }
+                    if (!servicesCell.childElementCount) servicesCell.textContent = 'None identified';
                     row.appendChild(servicesCell);
           tbody.appendChild(row);
         }
+                if (!devices.length) tbody.innerHTML = '<tr><td class="empty" colspan="4">No devices found in the latest scan.</td></tr>';
+                document.getElementById('hostSearch').dispatchEvent(new Event('input'));
       } catch (error) {
-        document.getElementById('statusBadge').textContent = 'Waiting';
+                const statusBadge = document.getElementById('statusBadge');
+                statusBadge.textContent = 'Waiting for data';
+                statusBadge.dataset.state = 'waiting';
       }
     }
+        document.getElementById('hostSearch').addEventListener('input', event => {
+            const query = event.target.value.trim().toLowerCase();
+            for (const row of document.querySelectorAll('#deviceTable tr[data-search]')) {
+                row.hidden = !row.dataset.search.includes(query);
+            }
+        });
     fetchData();
     setInterval(fetchData, 15000);
   </script>
@@ -419,8 +484,21 @@ def write_dashboard_data(summary: dict, output_path: str = "dashboard_data.json"
 
 def render_network_map(gateway_ip: str, devices: Iterable[dict], output_path: str = "network_map.html") -> str:
     """Render a live network topology map as an HTML file."""
-    network = Network(height="90vh", bgcolor="#111111", font_color="white", directed=False)
-    network.add_node(gateway_ip, label=f"Gateway\n{gateway_ip}", color="#00e676", size=30, shape="dot")
+    network = Network(height="90vh", width="100%", bgcolor="#101714", font_color="#f4f7f5", directed=False)
+    network.set_options("""{
+      "nodes": {"borderWidth": 1, "font": {"face": "Arial", "size": 16, "color": "#f4f7f5"}, "shadow": {"enabled": true, "color": "rgba(0,0,0,0.35)", "size": 10, "x": 0, "y": 4}},
+      "edges": {"color": {"color": "#52645f", "highlight": "#d8a45b"}, "smooth": {"type": "continuous"}, "width": 1},
+      "physics": {"solver": "barnesHut", "barnesHut": {"gravitationalConstant": -4500, "centralGravity": 0.25, "springLength": 160, "springConstant": 0.04, "damping": 0.2}, "stabilization": {"iterations": 500}},
+      "interaction": {"hover": true, "navigationButtons": true, "keyboard": {"enabled": true}, "tooltipDelay": 150}
+    }""")
+    network.add_node(
+        gateway_ip,
+        label=f"Gateway\n{gateway_ip}",
+        title=f"Default gateway\n{gateway_ip}",
+        color={"background": "#d8a45b", "border": "#f0c987", "highlight": {"background": "#edbd70", "border": "#fff0d2"}},
+        size=28,
+        shape="dot",
+    )
 
     for device in devices:
         ip_address = str(device.get("ip") or "").strip()
@@ -429,6 +507,8 @@ def render_network_map(gateway_ip: str, devices: Iterable[dict], output_path: st
 
         hostname = str(device.get("hostname") or ip_address).strip() or ip_address
         vendor = str(device.get("vendor") or "Unknown").strip() or "Unknown"
+        ports = device.get("ports") or []
+        port_count = len(ports)
         services = device.get("services") or []
         service_details = "\n".join(
             escape(
@@ -437,13 +517,21 @@ def render_network_map(gateway_ip: str, devices: Iterable[dict], output_path: st
             )
             for service in services
         )
-        device_label = f"{hostname}\n{vendor}"
-        device_title = f"IP: {ip_address}\nMAC: {device.get('mac', 'Unknown')}\nVendor: {vendor}"
+        device_label = f"{hostname}\n{vendor} · {port_count} open port{'s' if port_count != 1 else ''}"
+        device_title = f"IP: {ip_address}\nMAC: {device.get('mac', 'Unknown')}\nVendor: {vendor}\nOpen ports: {', '.join(map(str, ports)) or 'none'}"
         if service_details:
             device_title += f"\nServices:\n{service_details}"
 
-        network.add_node(ip_address, label=device_label, title=device_title, color="#3b82f6", size=18, shape="box")
-        network.add_edge(gateway_ip, ip_address, value=2)
+        host_color = "#bd643c" if port_count else "#318678"
+        network.add_node(
+            ip_address,
+            label=device_label,
+            title=device_title,
+            color={"background": host_color, "border": "#dce8e2", "highlight": {"background": "#e4b15f", "border": "#fff0d2"}},
+            size=17 + min(port_count, 9),
+            shape="dot",
+        )
+        network.add_edge(gateway_ip, ip_address, value=1 + min(port_count, 4) * 0.35, title=f"{port_count} open port{'s' if port_count != 1 else ''}")
 
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)

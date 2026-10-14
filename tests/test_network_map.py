@@ -35,7 +35,14 @@ def test_render_network_map_creates_html_file(tmp_path):
     output_path = tmp_path / "network-map.html"
     devices = [
         {"ip": "192.168.1.1", "mac": "00:00:00:00:00:01", "hostname": "router", "vendor": "RouterOS"},
-        {"ip": "192.168.1.42", "mac": "00:00:00:00:00:02", "hostname": "printer", "vendor": "HP"},
+        {
+            "ip": "192.168.1.42",
+            "mac": "00:00:00:00:00:02",
+            "hostname": "printer",
+            "vendor": "HP",
+            "ports": [80, 443],
+            "services": [{"port": 443, "service": "https", "product": "Example"}],
+        },
     ]
 
     we547.render_network_map("192.168.1.1", devices, str(output_path))
@@ -44,3 +51,18 @@ def test_render_network_map_creates_html_file(tmp_path):
     html = output_path.read_text(encoding="utf-8")
     assert "network" in html.lower()
     assert "192.168.1.42" in html
+    assert "2 open ports" in html
+    assert "Open ports: 80, 443" in html
+    assert "barnesHut" in html
+
+
+def test_render_dashboard_includes_responsive_filter_and_states(tmp_path):
+    output_path = tmp_path / "dashboard.html"
+
+    we547.render_dashboard_html(str(output_path))
+
+    html = output_path.read_text(encoding="utf-8")
+    assert "@media (max-width:760px)" in html
+    assert 'id="hostSearch"' in html
+    assert "No devices found in the latest scan." in html
+    assert "Waiting for data" in html
